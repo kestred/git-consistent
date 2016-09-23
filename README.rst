@@ -3,13 +3,15 @@ git-consistent
 **************
 
 Git Consistent is a set of config files to keep your commit messages and branch
-names consistent for all contributors of a project.
+names consistent for all contributors of a project. It works with Linux and macOS.
 
 It can be very useful for large projects, personal projects, and as an easy
 to configure client-side tool when your git host doesn't support server-side
 git hooks.
 
-It work with both Linux or macOS.
+To the extent possible under law, I waive all copyright and related or neighboring rights to git-consistent.
+
+.. image:: http://i.creativecommons.org/p/zero/1.0/88x31.png
 
 
 Use
