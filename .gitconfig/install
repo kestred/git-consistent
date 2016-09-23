@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+# By default, macOS uses vi which works poorly with the template
+if [ "$(uname)" = "Darwin" ]; then
+  git config core.editor /usr/bin/vim
+fi
+
+# Configure git hooks and commit template
+git config commit.template .gitconfig/templates/commit
+cp .gitconfig/hooks/* .git/hooks/
