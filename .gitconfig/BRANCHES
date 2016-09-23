@@ -1,0 +1,6 @@
+# A list of allowed branch names.
+#
+# Names may include Unix-style wildcards.
+# See https://docs.python.org/2/library/fnmatch.html
+
+master

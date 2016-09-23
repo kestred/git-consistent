@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+#
+# This hook rejects pushes if a branch doesn't match one of the branch
+# name patterns defined in the .gitconfig/BRANCHES file.
+from fnmatch import fnmatch
+import subprocess
+import sys
+import os
+
+RED = '1;31'
+YELLOW = '1;33'
+
+def highlight(word, color):
+    return '\x1b[{1}m{0}\x1b[0m'.format(word, color)
+
+def highlight_comments(lines):
+    highlighted = []
+    for line in lines:
+        if len(line) > 0 and line[0] is '#':
+            highlighted.append(highlight(line, YELLOW))
+        else:
+            highlighted.append(line)
+    return highlighted
+
+def read(filepath):
+    with open(filepath) as f:
+        return f.read()
+
+def abort_push(error):
+    aborting = 'Aborting push:'
+    if sys.stderr.isatty():
+        aborting = highlight(aborting, RED)
+    sys.stderr.write(aborting + ' ' + error + '\n')
+    sys.exit(1)
+
+if __name__ == '__main__':
+    if os.path.isfile(".gitconfig/BRANCHES"):
+        topicfile = read(".gitconfig/BRANCHES").strip()
+        lines = [line.strip() for line in topicfile.split('\n')]
+        patterns = [l for l in lines if len(l) > 0 and l[0] is not '#']
+
+        # Get branch name
+        cmd = ['git', 'rev-parse', '--abbrev-ref', 'HEAD']
+        branch = subprocess.check_output(cmd).strip()
+
+        # Check if branch matches a pattern
+        matched = False
+        for pattern in patterns:
+            if fnmatch(branch, pattern):
+                matched = True
+        if not matched:
+            if sys.stderr.isatty():
+                lines = highlight_comments(lines)
+
+            abort_push('branch must match pattern in .gitconfig/BRANCHES:\n'
+                       '\n    ' + '\n    '.join(lines) + '\n')

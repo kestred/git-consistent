@@ -1,0 +1,25 @@
+#!/usr/bin/env python
+#
+# This hook restores any in-progress commit message, in case the commit had
+# been aborted due to a bad message format.
+import os
+import sys
+
+def read(filepath):
+    with open(filepath) as f:
+        return f.read()
+
+if __name__ == '__main__':
+    boundary = '# Please enter the commit message for your changes.'
+    if os.path.isfile('commit-msg.bak'):
+        backup = read('commit-msg.bak')
+        offset1 = backup.find(boundary)
+        prefix = backup[:offset1]
+
+        default = read(sys.argv[1])
+        offset2 = default.find(boundary)
+        suffix = default[offset2:]
+
+        with open(sys.argv[1], 'w') as f:
+            f.truncate()
+            f.write(prefix + suffix)

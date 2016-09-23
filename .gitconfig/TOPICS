@@ -1,0 +1,7 @@
+# This is the list of all topics that are allowed
+# within the project.  To allow any topic, delete
+# the .gitconfig/TOPICS file.
+#
+# Example subject line:
+#     topic: summary of commit
+#

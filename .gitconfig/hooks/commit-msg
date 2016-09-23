@@ -1,0 +1,162 @@
+#!/usr/bin/env python
+#
+# This hook checks that the commit message conforms to simple common formats
+#
+#   Add bell ringing steps to README
+#       OR
+#   myproject: fix argument handling in main()
+#
+import os
+import sys
+import subprocess
+import shutil
+import re
+
+RED = '1;31'
+YELLOW = '1;33'
+
+def highlight(word, color):
+    return '\x1b[{1}m{0}\x1b[0m'.format(word, color)
+
+def highlight_comments(lines):
+    highlighted = []
+    for line in lines:
+        if len(line) > 0 and line[0] is '#':
+            highlighted.append(highlight(line, YELLOW))
+        else:
+            highlighted.append(line)
+    return highlighted
+
+def read(filepath):
+    with open(filepath) as f:
+        return f.read()
+
+def is_bad_conjugation(word):
+    for ending in ['ing', 'ed', 'ion']:
+        if word.endswith(ending):
+            return True
+    return False
+
+def approx_changes():
+    total = 0
+    stats = subprocess.check_output(['git', 'diff', '--staged', '--numstat'])
+    for line in stats.split('\n'):
+        if len(line) > 0:
+            inserted, removed, filename = line.split('\t')
+            if inserted != '-' and removed != '-':
+                total += max(int(inserted), int(removed))
+    return total
+
+def abort_commit(error, save=True):
+    relpath = subprocess.check_output(['git', 'rev-parse', '--show-cdup'])
+    bakpath = os.path.join(relpath.strip(), 'commit-msg.bak')
+
+    aborting = 'Aborting commit:'
+    if sys.stderr.isatty():
+        aborting = highlight(aborting, RED)
+
+    sys.stderr.write(aborting + ' ' + error + '\n')
+    if save:
+        shutil.copyfile(sys.argv[1], bakpath)
+        sys.stderr.write('\n   (saved to ' + bakpath + ')\n\n')
+    sys.exit(1)
+
+def check_message(filepath):
+    with open(filepath, 'r') as f:
+        lines = f.read().split('\n')
+        lines = [l for l in lines if len(l) is 0 or l[0] is not '#']
+        while len(lines) > 0 and len(lines[-1]) is 0:
+            lines = lines[:-1]
+
+        if len(lines) == 0:
+            abort_commit('commit message must not be empty', False)
+
+        subject = lines[0]
+        if len(subject) is 0:
+            abort_commit('subject line must not be empty')
+        elif len(subject) > 50:
+            abort_commit('subject line must not be longer than 50 characters')
+        elif subject.endswith('.'):
+            abort_commit('subject line must not end with a period')
+
+        lower = subject.lower()
+        if (lower.startswith('wip')
+            or lower.startswith('squash')
+            or lower.startswith('fixup')
+            or lower.startswith('ammend')):
+            # ignore a (hopefully) temporary commit
+            return
+
+        if ':' in subject:
+            check_topic(subject)
+        else:
+            check_simple(subject)
+
+        if len(lines) < 2 and approx_changes() > 50 and not subject.startswith('Merge '):
+            abort_commit('message for large commits must include a description')
+
+        if len(lines) > 1 and len(lines[1]) != 0:
+            abort_commit('subject line must be followed by a blank line')
+
+        for line in lines[1:]:
+            if len(line) > 72:
+                abort_commit('body of commit must be wrapped at 72 characters')
+
+def check_simple(subject):
+    if not subject[0].isalnum() or not subject[0].isupper():
+        abort_commit('a simple subject line must start with a capital letter')
+
+    firstword = subject.split(' ')[0]
+    if is_bad_conjugation(firstword):
+        abort_commit('summary should be imperative'
+                     ' (eg. use "Add", not "Added" or "Adding")')
+
+def check_topic(subject):
+    if subject.count(':') > 1:
+        abort_commit("subject line with topic may contain only one ':'"
+                     ' (eg. "topic: summary")')
+
+    topic, summary = subject.split(':')
+
+    # check the topic
+    if len(topic) is 0:
+        abort_commit('subject line is missing a topic'
+                     ' (eg. "topic: summary")')
+    elif not re.match('^[a-z0-9/]+$', topic):
+        abort_commit('topic must be lowercase and alphanumeric'
+                     ' (eg. "topic: summary")')
+    elif os.path.isfile(".gitconfig/TOPICS"):
+        topicfile = read(".gitconfig/TOPICS").strip()
+        lines = [line.strip() for line in topicfile.split('\n')]
+        topics = [l for l in lines if len(l) > 0 and l[0] is not '#']
+        if topic not in topics:
+            if sys.stderr.isatty():
+                lines = highlight_comments(lines)
+
+            abort_commit('topic must be defined in .gitconfig/TOPICS:\n'
+                         '\n    ' + '\n    '.join(lines) + '\n')
+
+    # check topic-based summary
+    if len(summary) is 0:
+        abort_commit('subject line is missing a summary'
+                     ' (eg. "topic: summary")')
+    elif summary[0] is not ' ':
+        abort_commit('missing a space after topic in subject line'
+                     ' (eg. "topic: summary")')
+    elif not summary[1].islower():
+        abort_commit('summary must start with a lowercase character'
+                     ' (eg. "topic: summary")')
+
+    firstword = summary.split(' ')[0]
+    if is_bad_conjugation(firstword):
+        abort_commit('summary should be imperative'
+                     ' (eg. use "add", not "added" or "adding")')
+
+if __name__ == '__main__':
+    # Validate the commit message
+    check_message(sys.argv[1])
+
+    # If we haven't exited yet, the message is ok.
+    # Cleanup any commit-msg backup file (so we don't ruin rebases for example)
+    if os.path.isfile('commit-msg.bak'):
+        os.remove('commit-msg.bak')
