@@ -1,8 +1,6 @@
-# This commit will...                            _| (max 50 chars)
+
+# 1st. Write commit message above      ^^^      _| (max 50 chars)
+# 2nd. Why is this change being made? (and other notes)               _| (wrap at 72 chars)
 
 
-# Why is this change being made? (and other notes)                     _| (wrap at 72 chars)
-
-
-# Any references to tickets, articles, etc?
-
+# 3rd. Any references to tickets, articles, etc?
