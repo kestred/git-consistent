@@ -11,9 +11,14 @@ RED = '1;31'
 YELLOW = '1;33'
 
 def highlight(word, color):
+    if not sys.stderr.isatty():
+        return word
     return '\x1b[{1}m{0}\x1b[0m'.format(word, color)
 
 def highlight_comments(lines):
+    if not sys.stderr.isatty():
+        return lines
+
     highlighted = []
     for line in lines:
         if len(line) > 0 and line[0] is '#':
@@ -26,14 +31,22 @@ def read(filepath):
     with open(filepath) as f:
         return f.read()
 
-def abort_push(error):
-    aborting = 'Aborting push:'
-    if sys.stderr.isatty():
-        aborting = highlight(aborting, RED)
+def warn(message):
+    warning = highlight('Warning:', YELLOW)
+    sys.stderr.write(warning + ' ' + message + '\n')
+
+def abort(error):
+    aborting = highlight('Aborting push:', RED)
     sys.stderr.write(aborting + ' ' + error + '\n')
     sys.exit(1)
 
 if __name__ == '__main__':
+    # Check this file matches the latest version
+    if os.path.isfile('.gitconfig/hooks/pre-push'):
+        if read('.gitconfig/hooks/pre-push') != read(sys.argv[0]):
+            warn('pre-push hook is out-of-date (try .gitconfig/install)')
+
+    # Test branch names against patterns
     if os.path.isfile(".gitconfig/BRANCHES"):
         topicfile = read(".gitconfig/BRANCHES").strip()
         lines = [line.strip() for line in topicfile.split('\n')]
@@ -49,8 +62,6 @@ if __name__ == '__main__':
             if fnmatch(branch, pattern):
                 matched = True
         if not matched:
-            if sys.stderr.isatty():
-                lines = highlight_comments(lines)
-
-            abort_push('branch must match pattern in .gitconfig/BRANCHES:\n'
-                       '\n    ' + '\n    '.join(lines) + '\n')
+            lines = highlight_comments(lines)
+            abort('branch must match pattern in .gitconfig/BRANCHES:\n'
+                  '\n    ' + '\n    '.join(lines) + '\n')
